@@ -20,7 +20,8 @@
     • Default password: youshallnotpass (can be changed)&#xD;
     • Automatically configures with PlexBot when using the same network&#xD;
     [br][br]&#xD;
-    📚 Documentation: https://lavalink.dev/
+    📚 Documentation: https://lavalink.dev/&#xD;
+    📖 Unraid Setup Guide: https://github.com/julesdg6/plexbot/blob/main/unraid-template/UNRAID-SETUP-GUIDE.md
   </Overview>
   <Category>MediaApp:Music Status:Stable</Category>
   <WebUI/>

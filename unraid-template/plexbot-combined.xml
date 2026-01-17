@@ -31,6 +31,8 @@
     • Plex server URL and authentication token&#xD;
     [br][br]&#xD;
     📚 Complete documentation: https://github.com/julesdg6/plexbot&#xD;
+    📖 Unraid Setup Guide: https://github.com/julesdg6/plexbot/blob/main/unraid-template/UNRAID-SETUP-GUIDE.md&#xD;
+    📋 Quick Reference: https://github.com/julesdg6/plexbot/blob/main/unraid-template/QUICK-REFERENCE.md&#xD;
     [br][br]&#xD;
     ✨ ALL-IN-ONE CONTAINER: This template includes both PlexBot and Lavalink in a single container - no separate Lavalink container needed!
   </Overview>
