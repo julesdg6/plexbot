@@ -264,7 +264,7 @@ If you've tried the solutions above and are still experiencing problems:
    ```
 
 2. **Open an Issue:**
-   Submit the logs and a detailed description of your issue on our [GitHub repository](https://github.com/kalebbroo/plex_music_bot/issues)
+   Submit the logs and a detailed description of your issue on our [GitHub repository](https://github.com/julesdg6/plexbot/issues)
 
 3. **Discord Support:**
    Join our support server for real-time assistance

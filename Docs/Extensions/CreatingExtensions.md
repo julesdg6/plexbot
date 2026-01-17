@@ -450,4 +450,4 @@ To package your extension for distribution:
 
 ---
 
-This guide covers the basics of creating extensions for PlexBot. For more advanced techniques, see the [Advanced Extensions Guide](./AdvancedExtensions.md) or browse the [sample extensions repository](https://github.com/kalebbroo/plexbot-extensions-examples).
+This guide covers the basics of creating extensions for PlexBot. For more advanced techniques, see the [Advanced Extensions Guide](./AdvancedExtensions.md) or browse the [sample extensions repository](https://github.com/julesdg6/plexbot-extensions-examples).

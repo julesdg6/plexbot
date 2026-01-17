@@ -39,7 +39,7 @@ If the templates are not yet in Community Applications:
 1. In unRAID Docker tab, click **Add Container**
 2. Set **Template repositories** to:
    ```
-   https://github.com/julesdg6/PlexBot
+   https://github.com/julesdg6/plexbot
    ```
 3. Click on template dropdown and search for PlexBot templates
 
@@ -130,7 +130,7 @@ If you experience connection issues:
 
 ## Additional Resources
 
-- [PlexBot Documentation](https://github.com/julesdg6/PlexBot)
+- [PlexBot Documentation](https://github.com/julesdg6/plexbot)
 - [PlexBot Discord Support](https://discord.com/invite/5m4Wyu52Ek)
 - [Lavalink Documentation](https://lavalink.dev/)
 - [unRAID Forums](https://forums.unraid.net/)
@@ -148,13 +148,13 @@ Or use unRAID's built-in update feature in the Docker tab.
 
 The PlexBot icon is located at:
 ```
-https://raw.githubusercontent.com/julesdg6/PlexBot/main/Images/plexbot-unraid-icon.png
+https://raw.githubusercontent.com/julesdg6/plexbot/main/Images/plexbot-unraid-icon.png
 ```
 
 ## Support
 
 For issues specific to the unRAID templates:
-- [Open an issue on GitHub](https://github.com/julesdg6/PlexBot/issues)
+- [Open an issue on GitHub](https://github.com/julesdg6/plexbot/issues)
 
 For general PlexBot support:
 - [Visit the Discord server](https://discord.com/invite/5m4Wyu52Ek)

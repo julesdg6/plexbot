@@ -24,7 +24,7 @@
   </Overview>
   <Category>MediaApp:Music Status:Stable</Category>
   <WebUI/>
-  <TemplateURL>https://raw.githubusercontent.com/julesdg6/PlexBot/main/unraid-template/plexbot-lavalink.xml</TemplateURL>
+  <TemplateURL>https://raw.githubusercontent.com/julesdg6/plexbot/main/unraid-template/plexbot-lavalink.xml</TemplateURL>
   <Icon>https://raw.githubusercontent.com/lavalink-devs/Lavalink/master/branding/lavalink_logo.png</Icon>
   <ExtraParams>--network=plexbot-network</ExtraParams>
   <PostArgs/>

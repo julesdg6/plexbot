@@ -103,8 +103,8 @@ See the [Installation Guide](./Docs/Setup/Installation.md) and [Configuration Gu
 
 ### Quick Install
 ```bash
-git clone https://github.com/kalebbroo/PlexBot.git
-cd PlexBot
+git clone https://github.com/julesdg6/plexbot.git
+cd plexbot
 ```
 Config the .env and run the install_win.bat/install_linux.sh. This will build the Docker image, install dependencies, and start the container. 
 

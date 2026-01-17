@@ -15,8 +15,8 @@ This guide provides detailed instructions for installing and configuring PlexBot
 #### Step 1: Clone the Repository
 
 ```bash
-git clone https://github.com/kalebbroo/PlexBot.git
-cd PlexBot
+git clone https://github.com/julesdg6/plexbot.git
+cd plexbot
 ```
 
 #### Step 2: Configure Environment Variables
@@ -140,5 +140,5 @@ For more advanced configuration options and features, refer to the [Configuratio
 
 If you encounter issues not covered in this guide:
 - Check the [Troubleshooting Guide](../Guides/Troubleshooting.md)
-- Open an issue on our [GitHub repository](https://github.com/kalebbroo/plex_music_bot)
+- Open an issue on our [GitHub repository](https://github.com/julesdg6/plexbot)
 - Join our [Discord support server](https://discord.gg/plexbot)

@@ -66,7 +66,7 @@ Users can then add this repository to their unRAID Community Applications:
 1. In unRAID, go to **Apps** → **App Install Options**
 2. Add template repository URL:
    ```
-   https://github.com/julesdg6/PlexBot
+   https://github.com/julesdg6/plexbot
    ```
 3. The templates will appear in the Apps page
 
@@ -78,12 +78,12 @@ Users can install PlexBot directly using the template URL without adding to Comm
 2. Click **Template** dropdown
 3. At the bottom, paste template URL:
    ```
-   https://raw.githubusercontent.com/julesdg6/PlexBot/main/unraid-template/plexbot-lavalink.xml
+   https://raw.githubusercontent.com/julesdg6/plexbot/main/unraid-template/plexbot-lavalink.xml
    ```
 4. Configure and apply
 5. Repeat for PlexBot template:
    ```
-   https://raw.githubusercontent.com/julesdg6/PlexBot/main/unraid-template/plexbot.xml
+   https://raw.githubusercontent.com/julesdg6/plexbot/main/unraid-template/plexbot.xml
    ```
 
 ## Verification Checklist
@@ -91,7 +91,7 @@ Users can install PlexBot directly using the template URL without adding to Comm
 Before submitting, verify:
 
 - [ ] Both XML templates are valid XML (no parsing errors)
-- [ ] Icon URL is accessible: `https://raw.githubusercontent.com/julesdg6/PlexBot/main/Images/plexbot-unraid-icon.png`
+- [ ] Icon URL is accessible: `https://raw.githubusercontent.com/julesdg6/plexbot/main/Images/plexbot-unraid-icon.png`
 - [ ] Docker images are published and accessible:
   - [ ] `ghcr.io/julesdg6/plexbot:latest`
   - [ ] `ghcr.io/lavalink-devs/lavalink:4`

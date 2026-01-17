@@ -25,8 +25,8 @@ The PlexBot Docker setup uses these key files:
 
 ```bash
 # Clone the repository
-git clone https://github.com/kalebbroo/plex_music_bot.git
-cd plex_music_bot
+git clone https://github.com/julesdg6/plexbot.git
+cd plexbot
 
 # Configure environment variables
 cp RenameMe.env.txt .env

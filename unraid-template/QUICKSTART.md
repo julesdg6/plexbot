@@ -18,13 +18,13 @@ This directory contains everything needed to run PlexBot on unRAID:
 
 1. Install Lavalink first:
    - Docker tab → Add Container
-   - Template URL: `https://raw.githubusercontent.com/julesdg6/PlexBot/main/unraid-template/plexbot-lavalink.xml`
+   - Template URL: `https://raw.githubusercontent.com/julesdg6/plexbot/main/unraid-template/plexbot-lavalink.xml`
    - Configure password (default: `youshallnotpass`)
    - Apply
 
 2. Install PlexBot:
    - Docker tab → Add Container
-   - Template URL: `https://raw.githubusercontent.com/julesdg6/PlexBot/main/unraid-template/plexbot.xml`
+   - Template URL: `https://raw.githubusercontent.com/julesdg6/plexbot/main/unraid-template/plexbot.xml`
    - Set required fields:
      - Discord Bot Token
      - Plex URL
@@ -35,7 +35,7 @@ This directory contains everything needed to run PlexBot on unRAID:
 **Method 2: Add Repository to Community Applications**
 
 1. Apps → App Install Options
-2. Add repository URL: `https://github.com/julesdg6/PlexBot`
+2. Add repository URL: `https://github.com/julesdg6/plexbot`
 3. Search for "PlexBot" in Apps tab
 4. Install PlexBot-Lavalink first, then PlexBot
 
@@ -91,7 +91,7 @@ unraid-template/
 - [Full README](./README.md) - Detailed installation and configuration
 - [Main Documentation](../README.md) - PlexBot features and commands
 - [Discord Support](https://discord.com/invite/5m4Wyu52Ek) - Get help from the community
-- [GitHub Issues](https://github.com/julesdg6/PlexBot/issues) - Report bugs
+- [GitHub Issues](https://github.com/julesdg6/plexbot/issues) - Report bugs
 
 ## 🎯 Next Steps After Installation
 

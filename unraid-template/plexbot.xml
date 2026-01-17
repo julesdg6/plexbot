@@ -2,12 +2,12 @@
 <Container version="2">
   <Name>PlexBot</Name>
   <Repository>ghcr.io/julesdg6/plexbot:latest</Repository>
-  <Registry>https://github.com/julesdg6/PlexBot/pkgs/container/plexbot</Registry>
+  <Registry>https://github.com/julesdg6/plexbot/pkgs/container/plexbot</Registry>
   <Network>bridge</Network>
   <Shell>bash</Shell>
   <Privileged>false</Privileged>
-  <Support>https://github.com/julesdg6/PlexBot/issues</Support>
-  <Project>https://github.com/julesdg6/PlexBot</Project>
+  <Support>https://github.com/julesdg6/plexbot/issues</Support>
+  <Project>https://github.com/julesdg6/plexbot</Project>
   <Overview>
     Play your Plex music in Discord with style! &#xD;
     [br][br]&#xD;
@@ -31,14 +31,14 @@
     • Plex server URL and authentication token&#xD;
     • Lavalink is automatically started in companion container&#xD;
     [br][br]&#xD;
-    📚 Complete documentation: https://github.com/julesdg6/PlexBot&#xD;
+    📚 Complete documentation: https://github.com/julesdg6/plexbot&#xD;
     [br][br]&#xD;
     ⚠️ IMPORTANT: This container requires the Lavalink companion container to function. Both containers will be created when using this template.
   </Overview>
   <Category>MediaApp:Music Status:Stable</Category>
   <WebUI/>
-  <TemplateURL>https://raw.githubusercontent.com/julesdg6/PlexBot/main/unraid-template/plexbot.xml</TemplateURL>
-  <Icon>https://raw.githubusercontent.com/julesdg6/PlexBot/main/Images/plexbot-unraid-icon.png</Icon>
+  <TemplateURL>https://raw.githubusercontent.com/julesdg6/plexbot/main/unraid-template/plexbot.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/julesdg6/plexbot/main/Images/plexbot-unraid-icon.png</Icon>
   <ExtraParams>--network=plexbot-network</ExtraParams>
   <PostArgs/>
   <CPUset/>
