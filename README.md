@@ -126,6 +126,10 @@ PlexBot supports Docker for easy deployment. See the [Docker Guide](./Docs/Setup
 
 PlexBot is fully compatible with unRAID! We provide official unRAID Community Applications templates for easy installation.
 
+**📖 Complete Documentation:**
+- **[Quick Reference Guide](./unraid-template/QUICK-REFERENCE.md)** - Fast answers to all Unraid Docker configuration questions
+- **[Detailed Setup Guide](./unraid-template/UNRAID-SETUP-GUIDE.md)** - Comprehensive guide covering everything
+
 **Two deployment options available:**
 - **All-In-One Container** (Recommended): Single container with PlexBot + Lavalink - simplest setup! [See Guide](./unraid-template/README-COMBINED.md)
 - **Separate Containers**: PlexBot and Lavalink in separate containers for advanced users [See Guide](./unraid-template/README.md)
@@ -134,6 +138,8 @@ Quick setup on unRAID (All-In-One):
 1. Add container using template URL: `https://raw.githubusercontent.com/julesdg6/plexbot/main/unraid-template/plexbot-combined.xml`
 2. Configure your Discord bot token and Plex credentials
 3. Start the container and enjoy!
+
+**Need help with Unraid fields?** See the [Quick Reference](./unraid-template/QUICK-REFERENCE.md) for answers to: Name, Repository, Registry URL, Icon URL, Network Type, WebUI, Extra Parameters, and more.
 
 ---
 

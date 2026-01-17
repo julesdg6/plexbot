@@ -2,6 +2,30 @@
 
 This is a simplified, single-container deployment option for Unraid users who prefer everything in one container.
 
+> **📖 Complete Setup Guide:** See [UNRAID-SETUP-GUIDE.md](./UNRAID-SETUP-GUIDE.md) for detailed answers to all Unraid Docker configuration questions.
+
+## ⚡ Quick Answers for Unraid Configuration
+
+When adding this container in Unraid, you'll be asked these questions. Here are the answers:
+
+| Question | Answer |
+|----------|--------|
+| **Name** | `PlexBot-AllInOne` |
+| **Repository** | `ghcr.io/julesdg6/plexbot:combined` |
+| **Registry URL** | `https://ghcr.io` |
+| **Icon URL** | `https://raw.githubusercontent.com/julesdg6/plexbot/main/Images/plexbot-unraid-icon.png` |
+| **WebUI** | *(leave empty)* |
+| **Extra Parameters** | *(leave empty)* |
+| **Post Arguments** | *(leave empty)* |
+| **Network Type** | `Bridge` |
+| **Use Tailscale** | No |
+| **Console shell command** | `bash` |
+| **Privileged** | `false` (unchecked) |
+
+**📚 For more details on each field, see:** [QUICK-REFERENCE.md](./QUICK-REFERENCE.md)
+
+---
+
 ## What's Included
 
 This combined container includes:

@@ -32,6 +32,8 @@
     • Lavalink is automatically started in companion container&#xD;
     [br][br]&#xD;
     📚 Complete documentation: https://github.com/julesdg6/plexbot&#xD;
+    📖 Unraid Setup Guide: https://github.com/julesdg6/plexbot/blob/main/unraid-template/UNRAID-SETUP-GUIDE.md&#xD;
+    📋 Quick Reference: https://github.com/julesdg6/plexbot/blob/main/unraid-template/QUICK-REFERENCE.md&#xD;
     [br][br]&#xD;
     ⚠️ IMPORTANT: This container requires the Lavalink companion container to function. Both containers will be created when using this template.
   </Overview>

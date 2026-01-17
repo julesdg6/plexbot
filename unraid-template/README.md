@@ -2,6 +2,32 @@
 
 This directory contains the unRAID Community Applications templates for PlexBot.
 
+> **📖 Complete Setup Guide:** See [UNRAID-SETUP-GUIDE.md](./UNRAID-SETUP-GUIDE.md) for detailed answers to all Unraid Docker configuration questions including Name, Repository, Registry URL, Icon URL, Network Type, and all other required fields.
+
+## ⚡ Quick Answers for Unraid Configuration
+
+When configuring PlexBot in Unraid, here are the answers to the Docker container questions:
+
+### All-In-One Container (Recommended)
+| Field | Value |
+|-------|-------|
+| **Name** | `PlexBot-AllInOne` |
+| **Repository** | `ghcr.io/julesdg6/plexbot:combined` |
+| **Network Type** | `Bridge` |
+| **Extra Parameters** | *(leave empty)* |
+
+### Separate Containers (Advanced)
+| Field | PlexBot Value | Lavalink Value |
+|-------|---------------|----------------|
+| **Name** | `PlexBot` | `PlexBot-Lavalink` |
+| **Repository** | `ghcr.io/julesdg6/plexbot:latest` | `ghcr.io/lavalink-devs/lavalink:4` |
+| **Network Type** | `Bridge` | `Bridge` |
+| **Extra Parameters** | `--network=plexbot-network` | `--network=plexbot-network` |
+
+**📚 For complete details, see:** [QUICK-REFERENCE.md](./QUICK-REFERENCE.md)
+
+---
+
 ## Deployment Options
 
 **Choose one of the following deployment methods:**
