@@ -13,6 +13,11 @@ on:
       - 'PlexBot.csproj'
       - '.github/workflows/docker-combined.yml'
   workflow_dispatch:
+    inputs:
+      lavalink_version:
+        description: 'Lavalink version to use (default: 4.0.10)'
+        required: false
+        default: '4.0.10'
 
 env:
   REGISTRY: ghcr.io
@@ -54,3 +59,5 @@ jobs:
           push: true
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            LAVALINK_VERSION=${{ github.event.inputs.lavalink_version || '4.0.10' }}

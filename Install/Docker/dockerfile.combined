@@ -1,6 +1,9 @@
 # Combined PlexBot + Lavalink Dockerfile for single-container deployment
 # This is specifically designed for Unraid users who want everything in one container
 
+# Build argument for Lavalink version
+ARG LAVALINK_VERSION=4.0.10
+
 # Stage 1: Build PlexBot
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS plexbot-build
 
@@ -15,6 +18,9 @@ RUN dotnet publish -c Release -o /app/publish
 
 # Stage 2: Runtime image with both PlexBot and Lavalink
 FROM mcr.microsoft.com/dotnet/sdk:9.0 AS runtime
+
+# Re-declare ARG for use in this stage
+ARG LAVALINK_VERSION=4.0.10
 
 WORKDIR /app
 
@@ -45,8 +51,7 @@ RUN mkdir -p /opt/Lavalink/plugins && \
     mkdir -p /opt/Lavalink/logs
 
 # Download Lavalink
-RUN LAVALINK_VERSION=4.0.10 && \
-    wget -O /opt/Lavalink/Lavalink.jar \
+RUN wget -O /opt/Lavalink/Lavalink.jar \
     "https://github.com/lavalink-devs/Lavalink/releases/download/${LAVALINK_VERSION}/Lavalink.jar" || \
     wget -O /opt/Lavalink/Lavalink.jar \
     "https://github.com/lavalink-devs/Lavalink/releases/latest/download/Lavalink.jar"
