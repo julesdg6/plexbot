@@ -13,6 +13,13 @@ namespace PlexBot.Core.Services.LavaLink;
 public class PlayerService(VisualPlayerStateManager stateManager, IAudioService audioService, VisualPlayer visualPlayer, IServiceProvider serviceProvider)
     : IPlayerService
 {
+    // Configuration constants
+    private const float DefaultVolume = 0.2f;
+    private const int BatchSize = 3;
+    private const int TrackDelayMs = 100;
+    private const int BatchDelayMs = 300;
+    private const int RetryDelayMs = 500;
+
     private readonly TimeSpan _inactivityTimeout = TimeSpan.FromMinutes(EnvConfig.GetDouble("PLAYER_INACTIVITY_TIMEOUT", 2.0));
 
     /// <inheritdoc />
@@ -33,13 +40,6 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
             // Determine channel behavior based on connectToVoiceChannel parameter
             PlayerChannelBehavior channelBehavior = connectToVoiceChannel ? PlayerChannelBehavior.Join : PlayerChannelBehavior.None;
             PlayerRetrieveOptions retrieveOptions = new(channelBehavior);
-            // Create player factory
-            ValueTask<CustomLavaLinkPlayer> CreatePlayerAsync(IPlayerProperties<CustomLavaLinkPlayer, CustomPlayerOptions> properties,
-                IServiceProvider serviceProvider, CancellationToken token = default)
-            {
-                return ValueTask.FromResult(new CustomLavaLinkPlayer(properties, serviceProvider));
-            }
-            float defaultVolume = 0.2f;
             // Create player options
             CustomPlayerOptions playerOptions = new()
             {
@@ -50,7 +50,7 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
                     ? socketInteraction.Channel as ITextChannel
                     : null,
                 InactivityTimeout = _inactivityTimeout,
-                DefaultVolume = defaultVolume,
+                DefaultVolume = DefaultVolume,
             };
             // Wrap options for DI
             var optionsWrapper = Options.Create(playerOptions);
@@ -74,8 +74,8 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
             // Set volume if it's a new player
             if (result.Status == PlayerRetrieveStatus.Success)
             {
-                await result.Player.SetVolumeAsync(defaultVolume, cancellationToken);
-                Logs.Debug($"Created new player for guild {guildId} with volume {defaultVolume * 100:F0}%");
+                await result.Player.SetVolumeAsync(DefaultVolume, cancellationToken);
+                Logs.Debug($"Created new player for guild {guildId} with volume {DefaultVolume * 100:F0}%");
             }
             return result.Player;
         }
@@ -102,17 +102,7 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
         try
         {
             // Load the track through Lavalink
-            Logs.Debug($"Loading track: {track.Title} from URL: {track.PlaybackUrl}");
-
-            // Create track load options
-            TrackLoadOptions loadOptions = new()
-            {
-                SearchMode = TrackSearchMode.None
-            };
-            LavalinkTrack? lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                track.PlaybackUrl,
-                loadOptions,
-                cancellationToken: cancellationToken);
+            LavalinkTrack? lavalinkTrack = await LoadTrackAsync(track, cancellationToken);
             if (lavalinkTrack == null)
             {
                 Logs.Error($"Failed to load track: {track.Title} from URL: {track.PlaybackUrl}");
@@ -120,20 +110,7 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
                 return;
             }
             // Create custom queue item with rich metadata
-            CustomTrackQueueItem queueItem = new()
-            {
-                Title = track.Title,
-                Artist = track.Artist,
-                Album = track.Album,
-                ReleaseDate = track.ReleaseDate,
-                Artwork = track.ArtworkUrl,
-                Url = track.PlaybackUrl,
-                ArtistUrl = track.ArtistUrl,
-                Duration = track.DurationDisplay,
-                Studio = track.Studio,
-                RequestedBy = interaction.User.Username,
-                Reference = new TrackReference(lavalinkTrack)
-            };
+            CustomTrackQueueItem queueItem = CreateQueueItem(track, lavalinkTrack, interaction.User.Username);
             // Set playback options
             TrackPlayProperties playProperties = new()
             {
@@ -163,13 +140,13 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
         }
         try
         {
-            ITextChannel? channel = interaction.GetOriginalResponseAsync().Result.Channel as ITextChannel;
+            IUserMessage originalResponse = await interaction.GetOriginalResponseAsync();
+            ITextChannel? channel = originalResponse.Channel as ITextChannel;
             stateManager.CurrentPlayerChannel = channel ?? throw new InvalidOperationException("CurrentPlayerChannel is not set");
             List<Track> trackList = tracks.ToList();
             int totalCount = trackList.Count;
             Logs.Debug($"Adding {totalCount} tracks to queue");
             // Process tracks in smaller batches
-            const int batchSize = 3; // Process just 3 tracks at a time
             int successCount = 0;
             bool firstTrackProcessed = false;
             // Send a preliminary message for long playlists
@@ -183,55 +160,18 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
             // Keep track of failed tracks for a retry
             List<Track> failedTracks = [];
             // Process in batches
-            for (int batchStart = 0; batchStart < totalCount; batchStart += batchSize)
+            for (int batchStart = 0; batchStart < totalCount; batchStart += BatchSize)
             {
                 // Get the current batch
-                int currentBatchSize = Math.Min(batchSize, totalCount - batchStart);
+                int currentBatchSize = Math.Min(BatchSize, totalCount - batchStart);
                 List<Track> batch = trackList.Skip(batchStart).Take(currentBatchSize).ToList();
-                Logs.Debug($"Processing batch {batchStart / batchSize + 1} of {Math.Ceiling((double)totalCount / batchSize)} ({batch.Count} tracks)");
+                Logs.Debug($"Processing batch {batchStart / BatchSize + 1} of {Math.Ceiling((double)totalCount / BatchSize)} ({batch.Count} tracks)");
                 // Process one track at a time within the batch - more reliable than parallel in small batches
                 foreach (Track track in batch)
                 {
                     try
                     {
-                        Logs.Debug($"Loading track: {track.Title}");
-                        LavalinkTrack? lavalinkTrack;
-                        // Handle YouTube tracks differently
-                        if (track.SourceSystem.Equals("youtube", StringComparison.OrdinalIgnoreCase))
-                        {
-                            // Same YouTube handling as before
-                            TrackLoadOptions directOptions = new()
-                            {
-                                SearchMode = TrackSearchMode.None
-                            };
-                            lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                                track.PlaybackUrl,
-                                directOptions,
-                                cancellationToken: cancellationToken);
-                            if (lavalinkTrack == null)
-                            {
-                                TrackLoadOptions searchOptions = new()
-                                {
-                                    SearchMode = TrackSearchMode.YouTube
-                                };
-                                lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                                    track.PlaybackUrl,
-                                    searchOptions,
-                                    cancellationToken: cancellationToken);
-                            }
-                        }
-                        else
-                        {
-                            // For Plex tracks
-                            TrackLoadOptions loadOptions = new()
-                            {
-                                SearchMode = TrackSearchMode.None
-                            };
-                            lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                                track.PlaybackUrl,
-                                loadOptions,
-                                cancellationToken: cancellationToken);
-                        }
+                        LavalinkTrack? lavalinkTrack = await LoadTrackAsync(track, cancellationToken);
                         if (lavalinkTrack == null)
                         {
                             Logs.Warning($"Failed to load track: {track.Title} - will retry later");
@@ -240,21 +180,7 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
                         }
                         Logs.Debug($"Successfully loaded track: {track.Title ?? lavalinkTrack.Title}");
                         // Create queue item
-                        CustomTrackQueueItem queueItem = new()
-                        {
-                            // Prioritize Plex metadata over Lavalink metadata
-                            Title = track.Title ?? lavalinkTrack.Title ?? "Unknown Title",
-                            Artist = track.Artist ?? lavalinkTrack.Author ?? "Unknown Artist",
-                            Album = track.Album,
-                            ReleaseDate = track.ReleaseDate,
-                            Artwork = track.ArtworkUrl ?? lavalinkTrack.ArtworkUri?.ToString() ?? "",
-                            Url = track.PlaybackUrl,
-                            ArtistUrl = track.ArtistUrl,
-                            Duration = track.DurationDisplay,
-                            Studio = track.Studio,
-                            RequestedBy = interaction.User.Username,
-                            Reference = new TrackReference(lavalinkTrack)
-                        };
+                        CustomTrackQueueItem queueItem = CreateQueueItem(track, lavalinkTrack, interaction.User.Username);
                         // Play first track or add to queue
                         if (!firstTrackProcessed && player.State != PlayerState.Playing && player.State != PlayerState.Paused)
                         {
@@ -274,12 +200,12 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
                         failedTracks.Add(track);
                     }
                     // Small delay between individual tracks for stability
-                    await Task.Delay(100, cancellationToken);
+                    await Task.Delay(TrackDelayMs, cancellationToken);
                 }
                 // Longer delay between batches
-                if (batchStart + batchSize < totalCount)
+                if (batchStart + BatchSize < totalCount)
                 {
-                    await Task.Delay(300, cancellationToken); // 300ms pause between batches
+                    await Task.Delay(BatchDelayMs, cancellationToken);
                 }
             }
             // Try to recover failed tracks (one retry attempt)
@@ -292,43 +218,22 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
                     try
                     {
                         // Wait a bit longer before retry
-                        await Task.Delay(500, cancellationToken);
+                        await Task.Delay(RetryDelayMs, cancellationToken);
                         Logs.Debug($"Retrying track: {track.Title}");
-                        TrackLoadOptions loadOptions = new()
-                        {
-                            SearchMode = track.SourceSystem.Equals("youtube", StringComparison.OrdinalIgnoreCase)
-                                ? TrackSearchMode.YouTube
-                                : TrackSearchMode.None
-                        };
-                        LavalinkTrack? lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                            track.PlaybackUrl,
-                            loadOptions,
-                            cancellationToken: cancellationToken);
+
+                        LavalinkTrack? lavalinkTrack = await LoadTrackAsync(track, cancellationToken);
                         if (lavalinkTrack == null)
                         {
                             Logs.Warning($"Failed to load track on retry: {track.Title}");
                             continue;
                         }
+
                         // Create queue item and add to queue
-                        CustomTrackQueueItem queueItem = new()
-                        {
-                            // Prioritize Plex metadata over Lavalink metadata
-                            Title = track.Title ?? lavalinkTrack.Title ?? "Unknown Title",
-                            Artist = track.Artist ?? lavalinkTrack.Author ?? "Unknown Artist",
-                            Album = track.Album,
-                            ReleaseDate = track.ReleaseDate,
-                            Artwork = track.ArtworkUrl ?? lavalinkTrack.ArtworkUri?.ToString() ?? "",
-                            Url = track.PlaybackUrl,
-                            ArtistUrl = track.ArtistUrl,
-                            Duration = track.DurationDisplay,
-                            Studio = track.Studio,
-                            RequestedBy = interaction.User.Username,
-                            Reference = new TrackReference(lavalinkTrack)
-                        };
+                        CustomTrackQueueItem queueItem = CreateQueueItem(track, lavalinkTrack, interaction.User.Username);
                         await player.Queue.AddAsync(queueItem, cancellationToken);
                         successCount++;
                         // Pause between retries
-                        await Task.Delay(300, cancellationToken);
+                        await Task.Delay(BatchDelayMs, cancellationToken);
                     }
                     catch (Exception ex)
                     {
@@ -516,5 +421,70 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
             Logs.Error($"Error stopping player: {ex.Message}");
             throw new PlayerException($"Failed to stop player: {ex.Message}", "Stop", ex);
         }
+    }
+
+    /// <summary>Creates a CustomTrackQueueItem from track metadata and LavalinkTrack.
+    /// Centralizes the logic for building queue items with proper metadata prioritization.</summary>
+    /// <param name="track">The source track with Plex metadata</param>
+    /// <param name="lavalinkTrack">The Lavalink track instance</param>
+    /// <param name="requestedBy">Username of the user who requested the track</param>
+    /// <returns>A configured CustomTrackQueueItem</returns>
+    private static CustomTrackQueueItem CreateQueueItem(Track track, LavalinkTrack lavalinkTrack, string requestedBy)
+    {
+        return new CustomTrackQueueItem
+        {
+            // Prioritize Plex metadata over Lavalink metadata
+            Title = track.Title ?? lavalinkTrack.Title ?? "Unknown Title",
+            Artist = track.Artist ?? lavalinkTrack.Author ?? "Unknown Artist",
+            Album = track.Album,
+            ReleaseDate = track.ReleaseDate,
+            Artwork = track.ArtworkUrl ?? lavalinkTrack.ArtworkUri?.ToString() ?? "",
+            Url = track.PlaybackUrl,
+            ArtistUrl = track.ArtistUrl,
+            Duration = track.DurationDisplay,
+            Studio = track.Studio,
+            RequestedBy = requestedBy,
+            Reference = new TrackReference(lavalinkTrack)
+        };
+    }
+
+    /// <summary>Loads a track through Lavalink with proper search mode based on source system.
+    /// Handles YouTube tracks with fallback to search mode if direct loading fails.</summary>
+    /// <param name="track">The track to load</param>
+    /// <param name="cancellationToken">Token to cancel the operation</param>
+    /// <returns>The loaded LavalinkTrack or null if loading failed</returns>
+    private async Task<LavalinkTrack?> LoadTrackAsync(Track track, CancellationToken cancellationToken)
+    {
+        Logs.Debug($"Loading track: {track.Title}");
+
+        // Handle YouTube tracks differently - they may need search mode fallback
+        if (track.SourceSystem.Equals("youtube", StringComparison.OrdinalIgnoreCase))
+        {
+            // Try direct URL first
+            TrackLoadOptions directOptions = new() { SearchMode = TrackSearchMode.None };
+            LavalinkTrack? lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
+                track.PlaybackUrl,
+                directOptions,
+                cancellationToken: cancellationToken);
+
+            // Fallback to YouTube search if direct load fails
+            if (lavalinkTrack == null)
+            {
+                TrackLoadOptions searchOptions = new() { SearchMode = TrackSearchMode.YouTube };
+                lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
+                    track.PlaybackUrl,
+                    searchOptions,
+                    cancellationToken: cancellationToken);
+            }
+
+            return lavalinkTrack;
+        }
+
+        // For Plex and other tracks, use direct loading only
+        TrackLoadOptions loadOptions = new() { SearchMode = TrackSearchMode.None };
+        return await audioService.Tracks.LoadTrackAsync(
+            track.PlaybackUrl,
+            loadOptions,
+            cancellationToken: cancellationToken);
     }
 }

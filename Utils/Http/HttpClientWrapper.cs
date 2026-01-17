@@ -29,6 +29,82 @@ public class HttpClientWrapper(HttpClient httpClient, string serviceName, int ma
     private readonly int _maxRetries = maxRetries;
     private readonly TimeSpan _retryDelay = TimeSpan.FromSeconds(retryDelaySec);
 
+    /// <summary>Executes an operation with retry logic, handling transient errors and exponential backoff.
+    /// This centralizes the retry pattern used across all HTTP operations.</summary>
+    /// <typeparam name="T">The return type of the operation</typeparam>
+    /// <param name="operation">The async operation to execute with retries</param>
+    /// <param name="operationName">Name of the operation for logging purposes</param>
+    /// <param name="cancellationToken">Token to cancel the operation</param>
+    /// <returns>The result of the operation</returns>
+    /// <exception cref="PlexApiException">Thrown when the operation fails after all retry attempts</exception>
+    private async Task<T> ExecuteWithRetryAsync<T>(
+        Func<Task<T>> operation,
+        string operationName,
+        CancellationToken cancellationToken)
+    {
+        int attemptCount = 0;
+        Exception? lastException = null;
+
+        while (attemptCount <= _maxRetries)
+        {
+            try
+            {
+                attemptCount++;
+                Logs.Debug($"[{_serviceName}] {operationName} (Attempt {attemptCount}/{_maxRetries + 1})");
+                return await operation();
+            }
+            catch (HttpRequestException ex)
+            {
+                lastException = ex;
+                Logs.Warning($"[{_serviceName}] HTTP error: {ex.Message}");
+                if (attemptCount <= _maxRetries)
+                {
+                    await DelayForRetryAsync(attemptCount, cancellationToken);
+                    continue;
+                }
+            }
+            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+            {
+                lastException = ex;
+                Logs.Warning($"[{_serviceName}] Request timed out: {ex.Message}");
+                if (attemptCount <= _maxRetries)
+                {
+                    await DelayForRetryAsync(attemptCount, cancellationToken);
+                    continue;
+                }
+            }
+            catch (OperationCanceledException)
+            {
+                Logs.Info($"[{_serviceName}] Request was canceled");
+                throw;
+            }
+            catch (PlexApiException)
+            {
+                throw;
+            }
+            catch (Exception ex)
+            {
+                lastException = ex;
+                Logs.Error($"[{_serviceName}] Unexpected error: {ex.Message}");
+                break;
+            }
+        }
+
+        throw new PlexApiException(
+            $"Request to {_serviceName} failed after {attemptCount} attempts",
+            lastException ?? new InvalidOperationException("Unknown error"));
+    }
+
+    /// <summary>Calculates and waits for the appropriate delay before the next retry attempt using exponential backoff.</summary>
+    /// <param name="attemptCount">The current attempt number</param>
+    /// <param name="cancellationToken">Token to cancel the delay</param>
+    private async Task DelayForRetryAsync(int attemptCount, CancellationToken cancellationToken)
+    {
+        TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
+        Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
+        await Task.Delay(delay, cancellationToken);
+    }
+
     /// <summary>Sends a GET request to the specified URI with retry logic.
     /// Handles the complete request lifecycle including retries on transient errors
     /// and consistent error handling for different failure scenarios.</summary>
@@ -119,120 +195,66 @@ public class HttpClientWrapper(HttpClient httpClient, string serviceName, int ma
         Dictionary<string, string>? headers = null,
         CancellationToken cancellationToken = default)
     {
-        int attemptCount = 0;
-        Exception? lastException = null;
-        // Implement retry logic
-        while (attemptCount <= _maxRetries)
+        return await ExecuteWithRetryAsync(async () =>
         {
+            using HttpRequestMessage request = new(method, uri);
+
+            // Add headers
+            if (headers != null)
+            {
+                foreach (var header in headers)
+                {
+                    request.Headers.Add(header.Key, header.Value);
+                }
+            }
+
+            // Add content if provided
+            if (content != null)
+            {
+                string json = System.Text.Json.JsonSerializer.Serialize(content);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            }
+
+            // Send request
+            using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            // Handle unsuccessful status codes
+            if (!response.IsSuccessStatusCode)
+            {
+                Logs.Warning($"[{_serviceName}] Request failed with status {response.StatusCode}: {responseBody}");
+
+                // Determine if we should retry based on status code
+                if (ShouldRetry(response.StatusCode))
+                {
+                    throw new HttpRequestException($"Retryable status code: {response.StatusCode}");
+                }
+
+                throw new PlexApiException(
+                    $"Request to {_serviceName} failed with status code {response.StatusCode}",
+                    response.StatusCode,
+                    uri,
+                    responseBody);
+            }
+
+            // Deserialize response
             try
             {
-                attemptCount++;
-                Logs.Debug($"[{_serviceName}] {method} request to {uri} (Attempt {attemptCount}/{_maxRetries + 1})");
-                using HttpRequestMessage request = new(method, uri);
-                // Add headers
-                if (headers != null)
+                T result = System.Text.Json.JsonSerializer.Deserialize<T>(responseBody, new JsonSerializerOptions
                 {
-                    foreach (var header in headers)
-                    {
-                        request.Headers.Add(header.Key, header.Value);
-                    }
-                }
-                // Add content if provided
-                if (content != null)
-                {
-                    string json = System.Text.Json.JsonSerializer.Serialize(content);
-                    request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-                }
-                // Send request
-                using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
-                // Get response content even for error status codes
-                string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                // Handle unsuccessful status codes
-                if (!response.IsSuccessStatusCode)
-                {
-                    Logs.Warning($"[{_serviceName}] Request failed with status {response.StatusCode}: {responseBody}");
-                    // Determine if we should retry based on status code
-                    if (ShouldRetry(response.StatusCode) && attemptCount <= _maxRetries)
-                    {
-                        TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                        Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                        await Task.Delay(delay, cancellationToken);
-                        continue;
-                    }
-                    throw new PlexApiException(
-                        $"Request to {_serviceName} failed with status code {response.StatusCode}",
-                        response.StatusCode,
-                        uri,
-                        responseBody);
-                }
-                // For success responses, try to deserialize
-                try
-                {
-                    T result = System.Text.Json.JsonSerializer.Deserialize<T>(responseBody, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    }) ?? throw new InvalidOperationException("Deserialization returned null");
-                    Logs.Debug($"[{_serviceName}] Request successful");
-                    return result;
-                }
-                catch (System.Text.Json.JsonException ex)
-                {
-                    throw new PlexApiException(
-                        $"Failed to deserialize response from {_serviceName}: {ex.Message}",
-                        ex);
-                }
-            }
-            catch (HttpRequestException ex)
-            {
-                lastException = ex;
-                Logs.Warning($"[{_serviceName}] HTTP error: {ex.Message}");
-                // For connection-level errors, we should retry
-                if (attemptCount <= _maxRetries)
-                {
-                    TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                    Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                    await Task.Delay(delay, cancellationToken);
-                    continue;
-                }
-            }
-            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
-            {
-                // This is a timeout rather than a cancellation request
-                lastException = ex;
-                Logs.Warning($"[{_serviceName}] Request timed out: {ex.Message}");
+                    PropertyNameCaseInsensitive = true
+                }) ?? throw new InvalidOperationException("Deserialization returned null");
 
-                if (attemptCount <= _maxRetries)
-                {
-                    TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                    Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                    await Task.Delay(delay, cancellationToken);
-                    continue;
-                }
+                Logs.Debug($"[{_serviceName}] Request successful");
+                return result;
             }
-            catch (OperationCanceledException)
+            catch (System.Text.Json.JsonException ex)
             {
-                // This is an explicit cancellation request, don't retry
-                Logs.Info($"[{_serviceName}] Request was canceled");
-                throw;
+                throw new PlexApiException(
+                    $"Failed to deserialize response from {_serviceName}: {ex.Message}",
+                    ex);
             }
-            catch (PlexApiException)
-            {
-                // Already formatted exception, just rethrow
-                throw;
-            }
-            catch (Exception ex)
-            {
-                lastException = ex;
-                Logs.Error($"[{_serviceName}] Unexpected error: {ex.Message}");
-
-                // For unexpected errors, we should not retry
-                break;
-            }
-        }
-        // If we get here, all retries failed or an unretryable error occurred
-        throw new PlexApiException(
-            $"Request to {_serviceName} failed after {attemptCount} attempts",
-            lastException ?? new InvalidOperationException("Unknown error"));
+        }, $"{method} request to {uri}", cancellationToken);
     }
 
     /// <summary>Sends a request and returns the raw string response.
@@ -251,104 +273,51 @@ public class HttpClientWrapper(HttpClient httpClient, string serviceName, int ma
         Dictionary<string, string>? headers = null,
         CancellationToken cancellationToken = default)
     {
-        int attemptCount = 0;
-        Exception? lastException = null;
-        // Implement retry logic
-        while (attemptCount <= _maxRetries)
+        return await ExecuteWithRetryAsync(async () =>
         {
-            try
+            using HttpRequestMessage request = new(method, uri);
+
+            // Add headers
+            if (headers != null)
             {
-                attemptCount++;
-                Logs.Debug($"[{_serviceName}] {method} request to {uri} (Attempt {attemptCount}/{_maxRetries + 1})");
-                using HttpRequestMessage request = new(method, uri);
-                // Add headers
-                if (headers != null)
+                foreach (KeyValuePair<string, string> header in headers)
                 {
-                    foreach (KeyValuePair<string, string> header in headers)
-                    {
-                        request.Headers.Add(header.Key, header.Value);
-                    }
-                }
-                // Add content if provided
-                if (content != null)
-                {
-                    string json = System.Text.Json.JsonSerializer.Serialize(content);
-                    request.Content = new StringContent(json, Encoding.UTF8, "application/json");
-                }
-                // Send request
-                using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
-                // Get response content even for error status codes
-                string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                // Handle unsuccessful status codes
-                if (!response.IsSuccessStatusCode)
-                {
-                    Logs.Warning($"[{_serviceName}] Request failed with status {response.StatusCode}: {responseBody}");
-                    // Determine if we should retry based on status code
-                    if (ShouldRetry(response.StatusCode) && attemptCount <= _maxRetries)
-                    {
-                        TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                        Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                        await Task.Delay(delay, cancellationToken);
-                        continue;
-                    }
-                    throw new PlexApiException(
-                        $"Request to {_serviceName} failed with status code {response.StatusCode}",
-                        response.StatusCode,
-                        uri,
-                        responseBody);
-                }
-                Logs.Debug($"[{_serviceName}] Request successful");
-                return responseBody;
-            }
-            catch (HttpRequestException ex)
-            {
-                lastException = ex;
-                Logs.Warning($"[{_serviceName}] HTTP error: {ex.Message}");
-                // For connection-level errors, we should retry
-                if (attemptCount <= _maxRetries)
-                {
-                    TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                    Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                    await Task.Delay(delay, cancellationToken);
-                    continue;
+                    request.Headers.Add(header.Key, header.Value);
                 }
             }
-            catch (TaskCanceledException ex) when (!cancellationToken.IsCancellationRequested)
+
+            // Add content if provided
+            if (content != null)
             {
-                // This is a timeout rather than a cancellation request
-                lastException = ex;
-                Logs.Warning($"[{_serviceName}] Request timed out: {ex.Message}");
-                if (attemptCount <= _maxRetries)
+                string json = System.Text.Json.JsonSerializer.Serialize(content);
+                request.Content = new StringContent(json, Encoding.UTF8, "application/json");
+            }
+
+            // Send request
+            using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            // Handle unsuccessful status codes
+            if (!response.IsSuccessStatusCode)
+            {
+                Logs.Warning($"[{_serviceName}] Request failed with status {response.StatusCode}: {responseBody}");
+
+                // Determine if we should retry based on status code
+                if (ShouldRetry(response.StatusCode))
                 {
-                    TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                    Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                    await Task.Delay(delay, cancellationToken);
-                    continue;
+                    throw new HttpRequestException($"Retryable status code: {response.StatusCode}");
                 }
+
+                throw new PlexApiException(
+                    $"Request to {_serviceName} failed with status code {response.StatusCode}",
+                    response.StatusCode,
+                    uri,
+                    responseBody);
             }
-            catch (OperationCanceledException)
-            {
-                // This is an explicit cancellation request, don't retry
-                Logs.Info($"[{_serviceName}] Request was canceled");
-                throw;
-            }
-            catch (PlexApiException)
-            {
-                // Already formatted exception, just rethrow
-                throw;
-            }
-            catch (Exception ex)
-            {
-                lastException = ex;
-                Logs.Error($"[{_serviceName}] Unexpected error: {ex.Message}");
-                // For unexpected errors, we should not retry
-                break;
-            }
-        }
-        // If we get here, all retries failed or an unretryable error occurred
-        throw new PlexApiException(
-            $"Request to {_serviceName} failed after {attemptCount} attempts",
-            lastException ?? new InvalidOperationException("Unknown error"));
+
+            Logs.Debug($"[{_serviceName}] Request successful");
+            return responseBody;
+        }, $"{method} request to {uri}", cancellationToken);
     }
 
     /// <summary>Sends a request with custom content type.
@@ -370,102 +339,62 @@ public class HttpClientWrapper(HttpClient httpClient, string serviceName, int ma
         Dictionary<string, string>? headers = null,
         CancellationToken cancellationToken = default)
     {
-        int attemptCount = 0;
-        Exception? lastException = null;
-        // Implement retry logic
-        while (attemptCount <= _maxRetries)
+        return await ExecuteWithRetryAsync(async () =>
         {
+            using HttpRequestMessage request = new(method, uri);
+
+            // Add headers
+            if (headers != null)
+            {
+                foreach (var header in headers)
+                {
+                    request.Headers.Add(header.Key, header.Value);
+                }
+            }
+
+            // Add content with custom content type
+            request.Content = new StringContent(content, Encoding.UTF8, contentType);
+
+            // Send request
+            using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
+            string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+
+            // Handle unsuccessful status codes
+            if (!response.IsSuccessStatusCode)
+            {
+                Logs.Warning($"[{_serviceName}] Request failed with status {response.StatusCode}: {responseBody}");
+
+                // Determine if we should retry based on status code
+                if (ShouldRetry(response.StatusCode))
+                {
+                    throw new HttpRequestException($"Retryable status code: {response.StatusCode}");
+                }
+
+                throw new PlexApiException(
+                    $"Request to {_serviceName} failed with status code {response.StatusCode}",
+                    response.StatusCode,
+                    uri,
+                    responseBody);
+            }
+
+            // Deserialize response
             try
             {
-                attemptCount++;
-                Logs.Debug($"[{_serviceName}] {method} request to {uri} with content type {contentType} (Attempt {attemptCount}/{_maxRetries + 1})");
-                using HttpRequestMessage request = new(method, uri);
-                // Add headers
-                if (headers != null)
+                T result = System.Text.Json.JsonSerializer.Deserialize<T>(responseBody, new JsonSerializerOptions
                 {
-                    foreach (var header in headers)
-                    {
-                        request.Headers.Add(header.Key, header.Value);
-                    }
-                }
-                // Add content with custom content type
-                request.Content = new StringContent(content, Encoding.UTF8, contentType);
-                // Send request
-                using HttpResponseMessage response = await _httpClient.SendAsync(request, cancellationToken);
-                // Get response content even for error status codes
-                string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                // Handle unsuccessful status codes
-                if (!response.IsSuccessStatusCode)
-                {
-                    Logs.Warning($"[{_serviceName}] Request failed with status {response.StatusCode}: {responseBody}");
-                    // Determine if we should retry based on status code
-                    if (ShouldRetry(response.StatusCode) && attemptCount <= _maxRetries)
-                    {
-                        TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                        Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                        await Task.Delay(delay, cancellationToken);
-                        continue;
-                    }
-                    throw new PlexApiException(
-                        $"Request to {_serviceName} failed with status code {response.StatusCode}",
-                        response.StatusCode,
-                        uri,
-                        responseBody);
-                }
-                // For success responses, try to deserialize
-                try
-                {
-                    T result = System.Text.Json.JsonSerializer.Deserialize<T>(responseBody, new JsonSerializerOptions
-                    {
-                        PropertyNameCaseInsensitive = true
-                    }) ?? throw new InvalidOperationException("Deserialization returned null");
-                    Logs.Debug($"[{_serviceName}] Request successful");
-                    return result;
-                }
-                catch (System.Text.Json.JsonException ex)
-                {
-                    throw new PlexApiException(
-                        $"Failed to deserialize response from {_serviceName}: {ex.Message}",
-                        ex);
-                }
+                    PropertyNameCaseInsensitive = true
+                }) ?? throw new InvalidOperationException("Deserialization returned null");
+
+                Logs.Debug($"[{_serviceName}] Request successful");
+                return result;
             }
-            catch (Exception ex) when (ex is HttpRequestException || 
-                                      (ex is TaskCanceledException tce && !cancellationToken.IsCancellationRequested))
+            catch (System.Text.Json.JsonException ex)
             {
-                lastException = ex;
-                Logs.Warning($"[{_serviceName}] HTTP error: {ex.Message}");
-                // For connection-level errors, we should retry
-                if (attemptCount <= _maxRetries)
-                {
-                    TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                    Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                    await Task.Delay(delay, cancellationToken);
-                    continue;
-                }
+                throw new PlexApiException(
+                    $"Failed to deserialize response from {_serviceName}: {ex.Message}",
+                    ex);
             }
-            catch (OperationCanceledException)
-            {
-                // This is an explicit cancellation request, don't retry
-                Logs.Info($"[{_serviceName}] Request was canceled");
-                throw;
-            }
-            catch (PlexApiException)
-            {
-                // Already formatted exception, just rethrow
-                throw;
-            }
-            catch (Exception ex)
-            {
-                lastException = ex;
-                Logs.Error($"[{_serviceName}] Unexpected error: {ex.Message}");
-                // For unexpected errors, we should not retry
-                break;
-            }
-        }
-        // If we get here, all retries failed or an unretryable error occurred
-        throw new PlexApiException(
-            $"Request to {_serviceName} failed after {attemptCount} attempts",
-            lastException ?? new InvalidOperationException("Unknown error"));
+        }, $"{method} request to {uri} with content type {contentType}", cancellationToken);
     }
 
     /// <summary>Downloads a file from the specified URI with retry logic.</summary>
@@ -481,95 +410,56 @@ public class HttpClientWrapper(HttpClient httpClient, string serviceName, int ma
         Dictionary<string, string>? headers = null,
         CancellationToken cancellationToken = default)
     {
-        int attemptCount = 0;
-        Exception? lastException = null;
-        // Implement retry logic
-        while (attemptCount <= _maxRetries)
+        return await ExecuteWithRetryAsync(async () =>
         {
-            try
+            using HttpRequestMessage request = new(HttpMethod.Get, uri);
+
+            // Add headers
+            if (headers != null)
             {
-                attemptCount++;
-                Logs.Debug($"[{_serviceName}] Downloading file from {uri} to {destinationPath} (Attempt {attemptCount}/{_maxRetries + 1})");
-                using HttpRequestMessage request = new(HttpMethod.Get, uri);
-                // Add headers
-                if (headers != null)
+                foreach (var header in headers)
                 {
-                    foreach (var header in headers)
-                    {
-                        request.Headers.Add(header.Key, header.Value);
-                    }
-                }
-                // Send request with stream response
-                using HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-                // Handle unsuccessful status codes
-                if (!response.IsSuccessStatusCode)
-                {
-                    string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
-                    Logs.Warning($"[{_serviceName}] Download failed with status {response.StatusCode}: {responseBody}");
-                    // Determine if we should retry based on status code
-                    if (ShouldRetry(response.StatusCode) && attemptCount <= _maxRetries)
-                    {
-                        TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                        Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                        await Task.Delay(delay, cancellationToken);
-                        continue;
-                    }
-                    throw new PlexApiException(
-                        $"Download from {_serviceName} failed with status code {response.StatusCode}",
-                        response.StatusCode,
-                        uri,
-                        responseBody);
-                }
-                // Create directory if it doesn't exist
-                string? directory = System.IO.Path.GetDirectoryName(destinationPath);
-                if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
-                {
-                    Directory.CreateDirectory(directory);
-                }
-                // Download the file
-                using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
-                using FileStream fileStream = new(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
-                await contentStream.CopyToAsync(fileStream, 8192, cancellationToken);
-                Logs.Debug($"[{_serviceName}] File downloaded successfully to {destinationPath}");
-                return true;
-            }
-            catch (Exception ex) when (ex is HttpRequestException || 
-                                      (ex is TaskCanceledException tce && !cancellationToken.IsCancellationRequested))
-            {
-                lastException = ex;
-                Logs.Warning($"[{_serviceName}] Download error: {ex.Message}");
-                // For connection-level errors, we should retry
-                if (attemptCount <= _maxRetries)
-                {
-                    TimeSpan delay = TimeSpan.FromMilliseconds(_retryDelay.TotalMilliseconds * Math.Pow(2, attemptCount - 1));
-                    Logs.Debug($"[{_serviceName}] Retrying after {delay.TotalSeconds:N1} seconds...");
-                    await Task.Delay(delay, cancellationToken);
-                    continue;
+                    request.Headers.Add(header.Key, header.Value);
                 }
             }
-            catch (OperationCanceledException)
+
+            // Send request with stream response
+            using HttpResponseMessage response = await _httpClient.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+
+            // Handle unsuccessful status codes
+            if (!response.IsSuccessStatusCode)
             {
-                // This is an explicit cancellation request, don't retry
-                Logs.Info($"[{_serviceName}] Download was canceled");
-                throw;
+                string responseBody = await response.Content.ReadAsStringAsync(cancellationToken);
+                Logs.Warning($"[{_serviceName}] Download failed with status {response.StatusCode}: {responseBody}");
+
+                // Determine if we should retry based on status code
+                if (ShouldRetry(response.StatusCode))
+                {
+                    throw new HttpRequestException($"Retryable status code: {response.StatusCode}");
+                }
+
+                throw new PlexApiException(
+                    $"Download from {_serviceName} failed with status code {response.StatusCode}",
+                    response.StatusCode,
+                    uri,
+                    responseBody);
             }
-            catch (PlexApiException)
+
+            // Create directory if it doesn't exist
+            string? directory = System.IO.Path.GetDirectoryName(destinationPath);
+            if (!string.IsNullOrEmpty(directory) && !Directory.Exists(directory))
             {
-                // Already formatted exception, just rethrow
-                throw;
+                Directory.CreateDirectory(directory);
             }
-            catch (Exception ex)
-            {
-                lastException = ex;
-                Logs.Error($"[{_serviceName}] Unexpected download error: {ex.Message}");
-                // For unexpected errors, we should not retry
-                break;
-            }
-        }
-        // If we get here, all retries failed or an unretryable error occurred
-        throw new PlexApiException(
-            $"Download from {_serviceName} failed after {attemptCount} attempts",
-            lastException ?? new InvalidOperationException("Unknown error"));
+
+            // Download the file
+            using Stream contentStream = await response.Content.ReadAsStreamAsync(cancellationToken);
+            using FileStream fileStream = new(destinationPath, FileMode.Create, FileAccess.Write, FileShare.None, 8192, true);
+            await contentStream.CopyToAsync(fileStream, 8192, cancellationToken);
+
+            Logs.Debug($"[{_serviceName}] File downloaded successfully to {destinationPath}");
+            return true;
+        }, $"Downloading file from {uri} to {destinationPath}", cancellationToken);
     }
 
     /// <summary>Determines whether a request should be retried based on its status code.
