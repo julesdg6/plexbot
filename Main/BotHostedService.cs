@@ -58,6 +58,8 @@ public class BotHostedService(DiscordSocketClient client, DiscordEventHandler ev
                 Logs.Info("Bot service will not start until configuration is complete.");
                 return;
             }
+
+            LogConfigurationStatus(plexUrl, plexToken);
             
             // Initialize event handlers
             await eventHandler.InitializeAsync();
@@ -84,6 +86,22 @@ public class BotHostedService(DiscordSocketClient client, DiscordEventHandler ev
             Logs.Error($"Error starting bot service: {ex.Message}");
             throw;
         }
+    }
+
+    private void LogConfigurationStatus(string plexUrl, string plexToken)
+    {
+        string vaultStatus(string value) => string.IsNullOrWhiteSpace(value) ? "not set" : "configured";
+        string prettyPort(string key, string defaultValue) => EnvConfig.Get(key, defaultValue);
+
+        string discordStatus = vaultStatus(_discordToken);
+        string plexUrlDisplay = string.IsNullOrWhiteSpace(plexUrl) ? "not set" : plexUrl;
+        string plexTokenStatus = vaultStatus(plexToken);
+        string lavalinkHost = EnvConfig.Get("LAVALINK_HOST", "localhost");
+        string lavalinkPort = EnvConfig.Get("LAVALINK_SERVER_PORT", "2333");
+        string lavalinkPasswordStatus = vaultStatus(EnvConfig.Get("LAVALINK_SERVER_PASSWORD", ""));
+        string statusWebPort = prettyPort("STATUS_WEB_PORT", "4303");
+
+        Logs.Info($"Configuration summary: DISCORD_TOKEN={discordStatus}, PLEX_URL={plexUrlDisplay}, PLEX_TOKEN={plexTokenStatus}, LavalinkHost={lavalinkHost}, LavalinkPort={lavalinkPort}, LavalinkPassword={lavalinkPasswordStatus}, StatusWebPort={statusWebPort}");
     }
 
     /// <summary>Initializes the static player channel if enabled in configuration</summary>

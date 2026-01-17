@@ -38,11 +38,13 @@ The web interface displays:
 
 ### Configuration Help
 
-If any required settings are missing, the web UI shows:
-- ⚠️ Clear warning about what's missing
-- 📝 Direct links to get required tokens
-- 📚 Links to setup documentation
-- 💡 Instructions for configuring in Unraid
+- If any required settings are missing, the web UI shows:
+  - ⚠️ Clear warning about what's missing
+  - 📝 Direct links to get required tokens
+  - 📚 Links to setup documentation
+  - 💡 Instructions for configuring in Unraid
+  
+  The container also logs a configuration summary on startup (`docker logs plexbot`), for example `Configuration summary: DISCORD_TOKEN=configured, PLEX_URL=http://..., PLEX_TOKEN=configured...`, so you can cross-check that the values Unraid is passing matched what you entered.
 
 When you edit the container in Unraid, click **Show more settings...** (or the **Add another Path, Port, Variable, Label or Device** link) to reveal the environment variables such as `DISCORD_TOKEN`, `PLEX_URL`, `PLEX_TOKEN`, and `LAVALINK_SERVER_PASSWORD`. The status dashboard highlights which of those required fields still need values.
 
