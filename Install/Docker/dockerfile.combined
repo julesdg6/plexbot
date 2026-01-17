@@ -32,7 +32,7 @@ RUN apt-get update && apt-get install -y \
     fonts-noto-color-emoji \
     fonts-ipafont-gothic \
     fonts-ipafont-mincho \
-    openjdk-21-jre-headless \
+    openjdk-17-jre-headless \
     supervisor \
     && rm -rf /var/lib/apt/lists/*
 
@@ -45,9 +45,11 @@ RUN mkdir -p /opt/Lavalink/plugins && \
     mkdir -p /opt/Lavalink/logs
 
 # Download Lavalink
-RUN LAVALINK_VERSION=4.0.8 && \
+RUN LAVALINK_VERSION=4.0.10 && \
     wget -O /opt/Lavalink/Lavalink.jar \
-    "https://github.com/lavalink-devs/Lavalink/releases/download/${LAVALINK_VERSION}/Lavalink.jar"
+    "https://github.com/lavalink-devs/Lavalink/releases/download/${LAVALINK_VERSION}/Lavalink.jar" || \
+    wget -O /opt/Lavalink/Lavalink.jar \
+    "https://github.com/lavalink-devs/Lavalink/releases/latest/download/Lavalink.jar"
 
 # Copy Lavalink configuration
 COPY Install/Docker/lavalink.application.yml /opt/Lavalink/application.yml
