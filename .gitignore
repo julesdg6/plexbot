@@ -151,5 +151,6 @@ ScaffoldingReadMe.txt
 
 # Ignore.cs files in the Plugins folder
 Extensions/**/*.cs
-/Install/Docker/plugins
-Install/Docker/lavalink.application.yml
+# Include Lavalink default config and plugins directory for Docker
+# /Install/Docker/plugins
+# Install/Docker/lavalink.application.yml
