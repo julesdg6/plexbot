@@ -102,17 +102,7 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
         try
         {
             // Load the track through Lavalink
-            Logs.Debug($"Loading track: {track.Title} from URL: {track.PlaybackUrl}");
-
-            // Create track load options
-            TrackLoadOptions loadOptions = new()
-            {
-                SearchMode = TrackSearchMode.None
-            };
-            LavalinkTrack? lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                track.PlaybackUrl,
-                loadOptions,
-                cancellationToken: cancellationToken);
+            LavalinkTrack? lavalinkTrack = await LoadTrackAsync(track, cancellationToken);
             if (lavalinkTrack == null)
             {
                 Logs.Error($"Failed to load track: {track.Title} from URL: {track.PlaybackUrl}");
@@ -181,44 +171,7 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
                 {
                     try
                     {
-                        Logs.Debug($"Loading track: {track.Title}");
-                        LavalinkTrack? lavalinkTrack;
-                        // Handle YouTube tracks differently
-                        if (track.SourceSystem.Equals("youtube", StringComparison.OrdinalIgnoreCase))
-                        {
-                            // Same YouTube handling as before
-                            TrackLoadOptions directOptions = new()
-                            {
-                                SearchMode = TrackSearchMode.None
-                            };
-                            lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                                track.PlaybackUrl,
-                                directOptions,
-                                cancellationToken: cancellationToken);
-                            if (lavalinkTrack == null)
-                            {
-                                TrackLoadOptions searchOptions = new()
-                                {
-                                    SearchMode = TrackSearchMode.YouTube
-                                };
-                                lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                                    track.PlaybackUrl,
-                                    searchOptions,
-                                    cancellationToken: cancellationToken);
-                            }
-                        }
-                        else
-                        {
-                            // For Plex tracks
-                            TrackLoadOptions loadOptions = new()
-                            {
-                                SearchMode = TrackSearchMode.None
-                            };
-                            lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                                track.PlaybackUrl,
-                                loadOptions,
-                                cancellationToken: cancellationToken);
-                        }
+                        LavalinkTrack? lavalinkTrack = await LoadTrackAsync(track, cancellationToken);
                         if (lavalinkTrack == null)
                         {
                             Logs.Warning($"Failed to load track: {track.Title} - will retry later");
@@ -267,21 +220,14 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
                         // Wait a bit longer before retry
                         await Task.Delay(RetryDelayMs, cancellationToken);
                         Logs.Debug($"Retrying track: {track.Title}");
-                        TrackLoadOptions loadOptions = new()
-                        {
-                            SearchMode = track.SourceSystem.Equals("youtube", StringComparison.OrdinalIgnoreCase)
-                                ? TrackSearchMode.YouTube
-                                : TrackSearchMode.None
-                        };
-                        LavalinkTrack? lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
-                            track.PlaybackUrl,
-                            loadOptions,
-                            cancellationToken: cancellationToken);
+
+                        LavalinkTrack? lavalinkTrack = await LoadTrackAsync(track, cancellationToken);
                         if (lavalinkTrack == null)
                         {
                             Logs.Warning($"Failed to load track on retry: {track.Title}");
                             continue;
                         }
+
                         // Create queue item and add to queue
                         CustomTrackQueueItem queueItem = CreateQueueItem(track, lavalinkTrack, interaction.User.Username);
                         await player.Queue.AddAsync(queueItem, cancellationToken);
@@ -500,5 +446,45 @@ public class PlayerService(VisualPlayerStateManager stateManager, IAudioService 
             RequestedBy = requestedBy,
             Reference = new TrackReference(lavalinkTrack)
         };
+    }
+
+    /// <summary>Loads a track through Lavalink with proper search mode based on source system.
+    /// Handles YouTube tracks with fallback to search mode if direct loading fails.</summary>
+    /// <param name="track">The track to load</param>
+    /// <param name="cancellationToken">Token to cancel the operation</param>
+    /// <returns>The loaded LavalinkTrack or null if loading failed</returns>
+    private async Task<LavalinkTrack?> LoadTrackAsync(Track track, CancellationToken cancellationToken)
+    {
+        Logs.Debug($"Loading track: {track.Title}");
+
+        // Handle YouTube tracks differently - they may need search mode fallback
+        if (track.SourceSystem.Equals("youtube", StringComparison.OrdinalIgnoreCase))
+        {
+            // Try direct URL first
+            TrackLoadOptions directOptions = new() { SearchMode = TrackSearchMode.None };
+            LavalinkTrack? lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
+                track.PlaybackUrl,
+                directOptions,
+                cancellationToken: cancellationToken);
+
+            // Fallback to YouTube search if direct load fails
+            if (lavalinkTrack == null)
+            {
+                TrackLoadOptions searchOptions = new() { SearchMode = TrackSearchMode.YouTube };
+                lavalinkTrack = await audioService.Tracks.LoadTrackAsync(
+                    track.PlaybackUrl,
+                    searchOptions,
+                    cancellationToken: cancellationToken);
+            }
+
+            return lavalinkTrack;
+        }
+
+        // For Plex and other tracks, use direct loading only
+        TrackLoadOptions loadOptions = new() { SearchMode = TrackSearchMode.None };
+        return await audioService.Tracks.LoadTrackAsync(
+            track.PlaybackUrl,
+            loadOptions,
+            cancellationToken: cancellationToken);
     }
 }
