@@ -28,56 +28,8 @@ fi
 # Create Extensions directory
 mkdir -p "$DOCKER_DIR/Extensions"
 
-# Create Lavalink application.yml if it doesn't exist
-if [ ! -f "$DOCKER_DIR/lavalink.application.yml" ]; then
-    echo "Creating Lavalink configuration..."
-    cat > "$DOCKER_DIR/lavalink.application.yml" << 'EOF'
-server:
-# Port and address come from environment variables
-lavalink:
-  server:
-    # Password comes from environment variables
-    sources:
-      youtube: false  # Disable built-in YouTube source as we're using the plugin
-      bandcamp: true
-      soundcloud: true
-      twitch: true
-      vimeo: true
-      http: true
-      local: false
-      nico: true
-    bufferDurationMs: 400
-    frameBufferDurationMs: 5000
-    youtubePlaylistLoadLimit: 10
-    playerUpdateInterval: 3
-    trackStuckThresholdMs: 10000
-    youtubeSearchEnabled: true
-    soundcloudSearchEnabled: true
-    gc-warnings: true
-  plugins:
-    - dependency: "dev.lavalink.youtube:youtube-plugin:1.13.5"
-      snapshot: false
-plugins:
-  youtube:
-    enabled: true
-    allowSearch: true
-    allowDirectVideoIds: true
-    allowDirectPlaylistIds: true
-    clients:
-      - TVHTML5EMBEDDED
-      - TV 
-    oauth:
-      enabled: true
-      refreshToken: ""
-logging:
-  file:
-    max-history: 30
-    max-size: 1GB
-  level:
-    root: INFO
-    lavalink: INFO
-EOF
-fi
+# Create plugins directory if it doesn't exist
+mkdir -p "$DOCKER_DIR/plugins"
 
 # Check if .env file exists
 if [ ! -f "$ROOT_DIR/.env" ]; then
