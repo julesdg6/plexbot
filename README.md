@@ -122,6 +122,16 @@ PLEX_BASE_URL=your-plex-base-url
 
 PlexBot supports Docker for easy deployment. See the [Docker Guide](./Docs/Setup/Docker-Guide.md).
 
+### unRAID Support
+
+PlexBot is fully compatible with unRAID! We provide official unRAID Community Applications templates for easy installation. See the [unRAID Template Guide](./unraid-template/README.md) for detailed setup instructions.
+
+Quick setup on unRAID:
+1. Install the **PlexBot-Lavalink** template first
+2. Install the **PlexBot** template
+3. Configure your Discord bot token and Plex credentials
+4. Start both containers and enjoy!
+
 ---
 
 ## 🛠️ Extensions & Customization
