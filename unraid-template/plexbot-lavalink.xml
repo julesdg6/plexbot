@@ -1,0 +1,43 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>PlexBot-Lavalink</Name>
+  <Repository>ghcr.io/lavalink-devs/lavalink:4</Repository>
+  <Registry>https://github.com/lavalink-devs/Lavalink/pkgs/container/lavalink</Registry>
+  <Network>bridge</Network>
+  <Shell>sh</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/lavalink-devs/Lavalink/issues</Support>
+  <Project>https://github.com/lavalink-devs/Lavalink</Project>
+  <Overview>
+    Lavalink is a standalone audio streaming node for Discord bots. This is a companion container required by PlexBot.&#xD;
+    [br][br]&#xD;
+    Lavalink provides high-quality audio playback for Discord music bots. It handles all audio streaming, processing, and mixing operations.&#xD;
+    [br][br]&#xD;
+    ⚠️ IMPORTANT: This container must be running for PlexBot to work. Install this BEFORE installing PlexBot.&#xD;
+    [br][br]&#xD;
+    🔧 CONFIGURATION:&#xD;
+    • Default port: 2333&#xD;
+    • Default password: youshallnotpass (can be changed)&#xD;
+    • Automatically configures with PlexBot when using the same network&#xD;
+    [br][br]&#xD;
+    📚 Documentation: https://lavalink.dev/
+  </Overview>
+  <Category>MediaApp:Music Status:Stable</Category>
+  <WebUI/>
+  <TemplateURL>https://raw.githubusercontent.com/julesdg6/PlexBot/main/unraid-template/plexbot-lavalink.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/lavalink-devs/Lavalink/master/branding/lavalink_logo.png</Icon>
+  <ExtraParams>--network=plexbot-network</ExtraParams>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled></DateInstalled>
+  <DonateText/>
+  <DonateLink/>
+  <Requires>PlexBot requires this container to be running.</Requires>
+  <Config Name="Lavalink Port" Target="2333" Default="2333" Mode="tcp" Description="Lavalink server port. Must match the LAVALINK_SERVER_PORT in PlexBot." Type="Port" Display="always" Required="true" Mask="false"/>
+  <Config Name="Server Port" Target="SERVER_PORT" Default="2333" Mode="" Description="Internal server port configuration." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Server Address" Target="SERVER_ADDRESS" Default="0.0.0.0" Mode="" Description="Server bind address." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Lavalink Password" Target="LAVALINK_SERVER_PASSWORD" Default="youshallnotpass" Mode="" Description="Lavalink authentication password. Must match the password in PlexBot configuration." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Java Options" Target="_JAVA_OPTIONS" Default="-Xmx2G" Mode="" Description="JVM options. Adjust -Xmx value based on your server's available memory." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Application Config" Target="/opt/Lavalink/application.yml" Default="/mnt/user/appdata/plexbot-lavalink/application.yml" Mode="rw" Description="Lavalink application configuration file. Optional - uses defaults if not provided." Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Plugins Directory" Target="/opt/Lavalink/plugins" Default="/mnt/user/appdata/plexbot-lavalink/plugins" Mode="rw" Description="Directory for Lavalink plugins. Optional." Type="Path" Display="advanced" Required="false" Mask="false"/>
+</Container>

@@ -40,10 +40,15 @@ RUN echo '#!/bin/bash' > /app/startup.sh && \
     echo 'SOURCE_DIR="/source"' >> /app/startup.sh && \
     echo 'APP_DIR="/app"' >> /app/startup.sh && \
     echo '' >> /app/startup.sh && \
-    echo '# Check that .env file exists' >> /app/startup.sh && \
-    echo 'if [ ! -f "$APP_DIR/.env" ]; then' >> /app/startup.sh && \
-    echo '    echo "ERROR: No .env file found. Please create a .env file with your Discord token and Plex server details."' >> /app/startup.sh && \
-    echo '    exit 1' >> /app/startup.sh && \
+    echo '# Check that configuration is provided (either .env file or environment variables)' >> /app/startup.sh && \
+    echo 'if [ ! -f "$APP_DIR/.env" ] && [ -z "$DISCORD_TOKEN" ]; then' >> /app/startup.sh && \
+    echo '    echo "WARNING: No .env file found and DISCORD_TOKEN environment variable not set."' >> /app/startup.sh && \
+    echo '    echo "Configuration can be provided via .env file or environment variables."' >> /app/startup.sh && \
+    echo '    echo "Attempting to start anyway in case variables are set..."' >> /app/startup.sh && \
+    echo 'fi' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo 'if [ ! -f "$APP_DIR/.env" ] && [ -n "$DISCORD_TOKEN" ]; then' >> /app/startup.sh && \
+    echo '    echo "Using environment variables for configuration (no .env file needed)"' >> /app/startup.sh && \
     echo 'fi' >> /app/startup.sh && \
     echo '' >> /app/startup.sh && \
     echo '# If the source directory is a git repository, update the source code' >> /app/startup.sh && \
