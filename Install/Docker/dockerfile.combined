@@ -1,0 +1,175 @@
+# Combined PlexBot + Lavalink Dockerfile for single-container deployment
+# This is specifically designed for Unraid users who want everything in one container
+
+# Build argument for Lavalink version
+ARG LAVALINK_VERSION=4.0.10
+
+# Stage 1: Build PlexBot
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS plexbot-build
+
+WORKDIR /source
+
+# Copy the project files
+COPY . .
+
+# Restore dependencies and build the project
+RUN dotnet restore
+RUN dotnet publish -c Release -o /app/publish
+
+# Stage 2: Runtime image with both PlexBot and Lavalink
+FROM mcr.microsoft.com/dotnet/sdk:9.0 AS runtime
+
+# Re-declare ARG for use in this stage
+ARG LAVALINK_VERSION=4.0.10
+
+WORKDIR /app
+
+# Install Java (required for Lavalink), supervisor (to run multiple processes), and other dependencies
+RUN apt-get update && apt-get install -y \
+    curl \
+    wget \
+    unzip \
+    git \
+    fontconfig \
+    fonts-dejavu \
+    fonts-liberation \
+    fonts-noto \
+    fonts-noto-cjk \
+    fonts-noto-color-emoji \
+    fonts-ipafont-gothic \
+    fonts-ipafont-mincho \
+    openjdk-17-jre-headless \
+    supervisor \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy the PlexBot build output from the build stage
+COPY --from=plexbot-build /app/publish .
+COPY Images /app/Images
+
+# Set up Lavalink
+RUN mkdir -p /opt/Lavalink/plugins && \
+    mkdir -p /opt/Lavalink/logs
+
+# Download Lavalink
+RUN wget -O /opt/Lavalink/Lavalink.jar \
+    "https://github.com/lavalink-devs/Lavalink/releases/download/${LAVALINK_VERSION}/Lavalink.jar" || \
+    wget -O /opt/Lavalink/Lavalink.jar \
+    "https://github.com/lavalink-devs/Lavalink/releases/latest/download/Lavalink.jar"
+
+# Copy Lavalink configuration
+COPY Install/Docker/lavalink.application.yml /opt/Lavalink/application.yml
+
+# Create supervisor configuration
+RUN mkdir -p /etc/supervisor/conf.d && \
+    echo '[supervisord]' > /etc/supervisor/supervisord.conf && \
+    echo 'nodaemon=true' >> /etc/supervisor/supervisord.conf && \
+    echo 'logfile=/var/log/supervisor/supervisord.log' >> /etc/supervisor/supervisord.conf && \
+    echo 'pidfile=/var/run/supervisord.pid' >> /etc/supervisor/supervisord.conf && \
+    echo '' >> /etc/supervisor/supervisord.conf && \
+    echo '[include]' >> /etc/supervisor/supervisord.conf && \
+    echo 'files = /etc/supervisor/conf.d/*.conf' >> /etc/supervisor/supervisord.conf
+
+# Create Lavalink supervisor config
+RUN echo '[program:lavalink]' > /etc/supervisor/conf.d/lavalink.conf && \
+    echo 'command=java -jar /opt/Lavalink/Lavalink.jar' >> /etc/supervisor/conf.d/lavalink.conf && \
+    echo 'directory=/opt/Lavalink' >> /etc/supervisor/conf.d/lavalink.conf && \
+    echo 'autostart=true' >> /etc/supervisor/conf.d/lavalink.conf && \
+    echo 'autorestart=true' >> /etc/supervisor/conf.d/lavalink.conf && \
+    echo 'stderr_logfile=/var/log/lavalink.err.log' >> /etc/supervisor/conf.d/lavalink.conf && \
+    echo 'stdout_logfile=/var/log/lavalink.out.log' >> /etc/supervisor/conf.d/lavalink.conf && \
+    echo 'priority=100' >> /etc/supervisor/conf.d/lavalink.conf
+
+# Create startup script for PlexBot that waits for Lavalink
+RUN echo '#!/bin/bash' > /app/startup.sh && \
+    echo 'set -e' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '# Directories' >> /app/startup.sh && \
+    echo 'SOURCE_DIR="/source"' >> /app/startup.sh && \
+    echo 'APP_DIR="/app"' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '# Wait for Lavalink to be ready' >> /app/startup.sh && \
+    echo 'echo "Waiting for Lavalink to start..."' >> /app/startup.sh && \
+    echo 'LAVALINK_HOST=${LAVALINK_HOST:-localhost}' >> /app/startup.sh && \
+    echo 'LAVALINK_PORT=${LAVALINK_SERVER_PORT:-2333}' >> /app/startup.sh && \
+    echo 'for i in {1..30}; do' >> /app/startup.sh && \
+    echo '    if curl -s "http://${LAVALINK_HOST}:${LAVALINK_PORT}/version" > /dev/null 2>&1; then' >> /app/startup.sh && \
+    echo '        echo "Lavalink is ready!"' >> /app/startup.sh && \
+    echo '        break' >> /app/startup.sh && \
+    echo '    fi' >> /app/startup.sh && \
+    echo '    echo "Waiting for Lavalink... ($i/30)"' >> /app/startup.sh && \
+    echo '    sleep 2' >> /app/startup.sh && \
+    echo 'done' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '# Check that configuration is provided' >> /app/startup.sh && \
+    echo 'if [ ! -f "$APP_DIR/.env" ] && [ -z "$DISCORD_TOKEN" ]; then' >> /app/startup.sh && \
+    echo '    echo "WARNING: No .env file found and DISCORD_TOKEN environment variable not set."' >> /app/startup.sh && \
+    echo '    echo "Configuration can be provided via .env file or environment variables."' >> /app/startup.sh && \
+    echo '    echo "Attempting to start anyway in case variables are set..."' >> /app/startup.sh && \
+    echo 'fi' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo 'if [ ! -f "$APP_DIR/.env" ] && [ -n "$DISCORD_TOKEN" ]; then' >> /app/startup.sh && \
+    echo '    echo "Using environment variables for configuration (no .env file needed)"' >> /app/startup.sh && \
+    echo 'fi' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '# If the source directory is a git repository, update the source code' >> /app/startup.sh && \
+    echo 'if [ -d "$SOURCE_DIR/.git" ]; then' >> /app/startup.sh && \
+    echo '    echo "Checking for updates in source code..."' >> /app/startup.sh && \
+    echo '    cd "$SOURCE_DIR"' >> /app/startup.sh && \
+    echo '    git pull' >> /app/startup.sh && \
+    echo '    cd -' >> /app/startup.sh && \
+    echo 'fi' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '# Function to check if rebuild is needed' >> /app/startup.sh && \
+    echo 'need_rebuild() {' >> /app/startup.sh && \
+    echo '  if [ ! -d "$APP_DIR/bin" ]; then' >> /app/startup.sh && \
+    echo '    echo "Binary directory does not exist, rebuild needed."' >> /app/startup.sh && \
+    echo '    return 0' >> /app/startup.sh && \
+    echo '  fi' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '  if [ -z "$(ls -A "$APP_DIR/bin" 2>/dev/null)" ]; then' >> /app/startup.sh && \
+    echo '    echo "Binary directory is empty, rebuild needed."' >> /app/startup.sh && \
+    echo '    return 0' >> /app/startup.sh && \
+    echo '  fi' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '  NEWEST_SOURCE=$(find "$SOURCE_DIR" -type f \( -name "*.cs" -o -name "*.csproj" \) -print0 2>/dev/null | xargs -0 stat --format "%Y" 2>/dev/null | sort -nr | head -n 1)' >> /app/startup.sh && \
+    echo '  NEWEST_BINARY=$(find "$APP_DIR/bin" -type f -name "*.dll" -print0 2>/dev/null | xargs -0 stat --format "%Y" 2>/dev/null | sort -nr | head -n 1)' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '  if [[ -z "$NEWEST_BINARY" || "$NEWEST_SOURCE" -gt "$NEWEST_BINARY" ]]; then' >> /app/startup.sh && \
+    echo '    echo "Source code is newer than binaries, rebuild needed."' >> /app/startup.sh && \
+    echo '    return 0' >> /app/startup.sh && \
+    echo '  fi' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '  return 1' >> /app/startup.sh && \
+    echo '}' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo '# Rebuild the project if needed' >> /app/startup.sh && \
+    echo 'if need_rebuild; then' >> /app/startup.sh && \
+    echo '    echo "Rebuilding project from source..."' >> /app/startup.sh && \
+    echo '    cd "$SOURCE_DIR"' >> /app/startup.sh && \
+    echo '    dotnet restore' >> /app/startup.sh && \
+    echo '    dotnet build -c Release' >> /app/startup.sh && \
+    echo '    dotnet publish -c Release -o "$APP_DIR/publish"' >> /app/startup.sh && \
+    echo '    cd "$APP_DIR"' >> /app/startup.sh && \
+    echo '    echo "Rebuild complete."' >> /app/startup.sh && \
+    echo 'fi' >> /app/startup.sh && \
+    echo '' >> /app/startup.sh && \
+    echo 'echo "Starting PlexBot application..."' >> /app/startup.sh && \
+    echo 'cd "$APP_DIR"' >> /app/startup.sh && \
+    echo 'exec dotnet PlexBot.dll' >> /app/startup.sh && \
+    chmod +x /app/startup.sh
+
+# Create PlexBot supervisor config
+RUN echo '[program:plexbot]' > /etc/supervisor/conf.d/plexbot.conf && \
+    echo 'command=/bin/bash /app/startup.sh' >> /etc/supervisor/conf.d/plexbot.conf && \
+    echo 'directory=/app' >> /etc/supervisor/conf.d/plexbot.conf && \
+    echo 'autostart=true' >> /etc/supervisor/conf.d/plexbot.conf && \
+    echo 'autorestart=true' >> /etc/supervisor/conf.d/plexbot.conf && \
+    echo 'stderr_logfile=/var/log/plexbot.err.log' >> /etc/supervisor/conf.d/plexbot.conf && \
+    echo 'stdout_logfile=/var/log/plexbot.out.log' >> /etc/supervisor/conf.d/plexbot.conf && \
+    echo 'priority=200' >> /etc/supervisor/conf.d/plexbot.conf
+
+# Expose Lavalink port (PlexBot doesn't need external ports)
+EXPOSE 2333
+
+# Start supervisor to manage both services
+CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

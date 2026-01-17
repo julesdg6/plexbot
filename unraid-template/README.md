@@ -1,8 +1,30 @@
 # PlexBot unRAID Template
 
-This directory contains the unRAID Community Applications templates for PlexBot and its companion Lavalink container.
+This directory contains the unRAID Community Applications templates for PlexBot.
 
-## Installation on unRAID
+## Deployment Options
+
+**Choose one of the following deployment methods:**
+
+### 🌟 All-In-One Container (Recommended for Most Users)
+A single container with both PlexBot and Lavalink included - simplest setup!
+- ✅ Easier to configure and manage
+- ✅ No network configuration needed
+- ✅ Perfect for Unraid users
+
+**[See All-In-One Installation Guide](./README-COMBINED.md)**
+
+### 🔧 Separate Containers (Advanced)
+PlexBot and Lavalink in separate containers for maximum flexibility.
+- ✅ Independent service management
+- ✅ Dedicated resources per service
+- ✅ More control over each component
+
+**Continue reading below for separate container installation.**
+
+---
+
+## Installation on unRAID (Separate Containers)
 
 ### Option 1: Via Community Applications (Recommended - When Available)
 

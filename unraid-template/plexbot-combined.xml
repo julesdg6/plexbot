@@ -1,0 +1,65 @@
+<?xml version="1.0"?>
+<Container version="2">
+  <Name>PlexBot-AllInOne</Name>
+  <Repository>ghcr.io/julesdg6/plexbot:combined</Repository>
+  <Registry>https://ghcr.io</Registry>
+  <Network>bridge</Network>
+  <Shell>bash</Shell>
+  <Privileged>false</Privileged>
+  <Support>https://github.com/julesdg6/plexbot/issues</Support>
+  <Project>https://github.com/julesdg6/plexbot</Project>
+  <Overview>
+    Play your Plex music in Discord with style! &#xD;
+    [br][br]&#xD;
+    PlexBot is a next-generation Discord music bot designed for Plex users. Seamlessly stream your personal music library (and more!) into your server's voice channels, enjoy a beautiful visual player, and take advantage of a robust extension system for ultimate flexibility.&#xD;
+    [br][br]&#xD;
+    🎵 FEATURES:&#xD;
+    • Stream from Plex: Play tracks, albums, artists, and playlists directly from your Plex server&#xD;
+    • YouTube Support: Search and play music from YouTube&#xD;
+    • Interactive Player UI: Choose between a modern image-based player or a classic Discord embed&#xD;
+    • Static Player Channel: Optionally dedicate a channel for the persistent player UI&#xD;
+    • Rich Queue Management: Add, remove, shuffle, and loop tracks with intuitive controls&#xD;
+    • Slash Commands: Clean, discoverable, and autocomplete-enabled&#xD;
+    • Extensible: Powerful Extensions system for custom features&#xD;
+    [br][br]&#xD;
+    🎨 VISUAL PLAYER STYLES:&#xD;
+    • Modern Visual Player: Sleek, image-based with album art as background&#xD;
+    • Classic Player Embed: Traditional Discord embed, compact and familiar&#xD;
+    [br][br]&#xD;
+    ⚙️ SETUP REQUIRED:&#xD;
+    • Discord bot token (get from https://discord.com/developers/applications)&#xD;
+    • Plex server URL and authentication token&#xD;
+    [br][br]&#xD;
+    📚 Complete documentation: https://github.com/julesdg6/plexbot&#xD;
+    [br][br]&#xD;
+    ✨ ALL-IN-ONE CONTAINER: This template includes both PlexBot and Lavalink in a single container - no separate Lavalink container needed!
+  </Overview>
+  <Category>MediaApp:Music Status:Stable</Category>
+  <WebUI/>
+  <TemplateURL>https://raw.githubusercontent.com/julesdg6/plexbot/main/unraid-template/plexbot-combined.xml</TemplateURL>
+  <Icon>https://raw.githubusercontent.com/julesdg6/plexbot/main/Images/plexbot-unraid-icon.png</Icon>
+  <ExtraParams/>
+  <PostArgs/>
+  <CPUset/>
+  <DateInstalled></DateInstalled>
+  <DonateText/>
+  <DonateLink/>
+  <Requires/>
+  <Config Name="Discord Bot Token" Target="DISCORD_TOKEN" Default="" Mode="" Description="Your Discord bot token from https://discord.com/developers/applications. REQUIRED." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Plex URL" Target="PLEX_URL" Default="http://YOUR_PLEX_IP:32400" Mode="" Description="Your Plex server URL (e.g., http://192.168.1.100:32400). REQUIRED." Type="Variable" Display="always" Required="true" Mask="false"/>
+  <Config Name="Plex Token" Target="PLEX_TOKEN" Default="" Mode="" Description="Your Plex authentication token. Get it from https://support.plex.tv/articles/204059436-finding-an-authentication-token-x-plex-token/. REQUIRED." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Lavalink Host" Target="LAVALINK_HOST" Default="localhost" Mode="" Description="Lavalink hostname. Use 'localhost' for all-in-one container." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Lavalink Port" Target="LAVALINK_SERVER_PORT" Default="2333" Mode="" Description="Lavalink server port. Default is 2333." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Lavalink Password" Target="LAVALINK_SERVER_PASSWORD" Default="youshallnotpass" Mode="" Description="Lavalink server password. Change for security." Type="Variable" Display="always" Required="true" Mask="true"/>
+  <Config Name="Bot Prefix" Target="BOT_PREFIX" Default="!" Mode="" Description="Prefix for text commands." Type="Variable" Display="normal" Required="false" Mask="false"/>
+  <Config Name="Status" Target="STATUS" Default="online" Mode="" Description="Bot status (online, idle, dnd, invisible)." Type="Variable" Display="normal" Required="false" Mask="false"/>
+  <Config Name="Use Modern Player" Target="USE_MODERN_PLAYER" Default="true" Mode="" Description="Use modern visual player (true) or classic embed style (false)." Type="Variable" Display="normal" Required="false" Mask="false"/>
+  <Config Name="Use Static Player Channel" Target="USE_STATIC_PLAYER_CHANNEL" Default="false" Mode="" Description="Enable static player channel (true/false)." Type="Variable" Display="normal" Required="false" Mask="false"/>
+  <Config Name="Static Player Channel ID" Target="STATIC_PLAYER_CHANNEL_ID" Default="" Mode="" Description="Discord channel ID for static player. Only used if USE_STATIC_PLAYER_CHANNEL is true." Type="Variable" Display="normal" Required="false" Mask="false"/>
+  <Config Name="Logging Level" Target="LOGGING_LEVEL_ROOT" Default="INFO" Mode="" Description="Global logging level (DEBUG, INFO, WARN, ERROR)." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Java Memory" Target="_JAVA_OPTIONS" Default="-Xmx2G" Mode="" Description="Java memory allocation for Lavalink. Adjust based on your server resources." Type="Variable" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Source Code Directory" Target="/source" Default="/mnt/user/appdata/plexbot/source" Mode="rw" Description="Mount point for PlexBot source code (enables auto-updates if git repo). Optional." Type="Path" Display="advanced" Required="false" Mask="false"/>
+  <Config Name="Data Directory" Target="/app/data" Default="/mnt/user/appdata/plexbot/data" Mode="rw" Description="Directory for PlexBot persistent data." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Logs Directory" Target="/app/logs" Default="/mnt/user/appdata/plexbot/logs" Mode="rw" Description="Directory for PlexBot log files." Type="Path" Display="always" Required="true" Mask="false"/>
+  <Config Name="Lavalink Port" Target="2333" Default="2333" Mode="tcp" Description="Lavalink server port (internal service, typically doesn't need external access)." Type="Port" Display="advanced" Required="false" Mask="false"/>
+</Container>
