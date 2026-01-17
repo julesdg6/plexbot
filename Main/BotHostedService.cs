@@ -21,8 +21,7 @@ public class BotHostedService(DiscordSocketClient client, DiscordEventHandler ev
     IServiceProvider serviceProvider) : IHostedService
 {
     private static readonly DiscordButtonBuilder _buttonBuilder = DiscordButtonBuilder.Instance;
-    private readonly string _discordToken = EnvConfig.Get("DISCORD_TOKEN")
-            ?? throw new InvalidOperationException("DISCORD_TOKEN environment variable is not set");
+    private readonly string _discordToken = EnvConfig.Get("DISCORD_TOKEN", "");
 
     /// <summary>Starts the bot service by initializing event handlers, loading extensions, and establishing connection to Discord and Lavalink</summary>
     /// <param name="cancellationToken">Token to monitor for cancellation requests to safely abort startup operations</param>
@@ -32,6 +31,34 @@ public class BotHostedService(DiscordSocketClient client, DiscordEventHandler ev
         try
         {
             Logs.Init("Starting bot service");
+            
+            // Validate required configuration
+            if (string.IsNullOrWhiteSpace(_discordToken) || _discordToken == "YOUR_BOT_TOKEN_HERE")
+            {
+                Logs.Error("DISCORD_TOKEN is not configured. Please set the DISCORD_TOKEN environment variable.");
+                Logs.Error("Visit the status web interface for configuration instructions.");
+                Logs.Info("Bot service will not start until configuration is complete.");
+                return; // Exit gracefully instead of crashing
+            }
+            
+            string plexUrl = EnvConfig.Get("PLEX_URL", "");
+            if (string.IsNullOrWhiteSpace(plexUrl) || plexUrl.Contains("YOUR_PLEX_IP") || plexUrl.Contains("PUBLIC_URL"))
+            {
+                Logs.Error("PLEX_URL is not configured. Please set the PLEX_URL environment variable.");
+                Logs.Error("Visit the status web interface for configuration instructions.");
+                Logs.Info("Bot service will not start until configuration is complete.");
+                return;
+            }
+            
+            string plexToken = EnvConfig.Get("PLEX_TOKEN", "");
+            if (string.IsNullOrWhiteSpace(plexToken) || plexToken == "YOUR_PLEX_TOKEN_HERE")
+            {
+                Logs.Error("PLEX_TOKEN is not configured. Please set the PLEX_TOKEN environment variable.");
+                Logs.Error("Visit the status web interface for configuration instructions.");
+                Logs.Info("Bot service will not start until configuration is complete.");
+                return;
+            }
+            
             // Initialize event handlers
             await eventHandler.InitializeAsync();
             ServiceCollection serviceDescriptors = new();

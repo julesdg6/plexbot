@@ -163,13 +163,14 @@ RUN echo '[program:plexbot]' > /etc/supervisor/conf.d/plexbot.conf && \
     echo 'command=/bin/bash /app/startup.sh' >> /etc/supervisor/conf.d/plexbot.conf && \
     echo 'directory=/app' >> /etc/supervisor/conf.d/plexbot.conf && \
     echo 'autostart=true' >> /etc/supervisor/conf.d/plexbot.conf && \
-    echo 'autorestart=true' >> /etc/supervisor/conf.d/plexbot.conf && \
+    echo 'autorestart=false' >> /etc/supervisor/conf.d/plexbot.conf && \
+    echo 'startsecs=0' >> /etc/supervisor/conf.d/plexbot.conf && \
     echo 'stderr_logfile=/var/log/plexbot.err.log' >> /etc/supervisor/conf.d/plexbot.conf && \
     echo 'stdout_logfile=/var/log/plexbot.out.log' >> /etc/supervisor/conf.d/plexbot.conf && \
     echo 'priority=200' >> /etc/supervisor/conf.d/plexbot.conf
 
-# Expose Lavalink port (PlexBot doesn't need external ports)
-EXPOSE 2333
+# Expose Lavalink port and status web UI port
+EXPOSE 2333 8080
 
 # Start supervisor to manage both services
 CMD ["/usr/bin/supervisord", "-c", "/etc/supervisor/supervisord.conf"]

@@ -22,6 +22,9 @@ namespace PlexBot.Main
             // Add HTTP client factory
             services.AddHttpClient();
 
+            // Add status web server
+            services.AddHostedService<StatusWebServer>();
+
             // Add Discord services
             AddDiscordServices(services);
 
